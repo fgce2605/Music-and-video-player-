@@ -192,10 +192,58 @@ Probing the boundaries of digital animation and immersive surround sound.""",
         }
     }
 
+    private fun getIgnoredUrls(context: Context): Set<String> {
+        val prefs = context.getSharedPreferences("omniplay_ignored_urls", Context.MODE_PRIVATE)
+        return prefs.getStringSet("ignored_set", emptySet()) ?: emptySet()
+    }
+
+    private fun addIgnoredUrl(context: Context, url: String) {
+        val prefs = context.getSharedPreferences("omniplay_ignored_urls", Context.MODE_PRIVATE)
+        val set = (prefs.getStringSet("ignored_set", emptySet()) ?: emptySet()).toMutableSet()
+        set.add(url)
+        prefs.edit().putStringSet("ignored_set", set).apply()
+    }
+
+    private fun removeIgnoredUrl(context: Context, url: String) {
+        val prefs = context.getSharedPreferences("omniplay_ignored_urls", Context.MODE_PRIVATE)
+        val set = (prefs.getStringSet("ignored_set", emptySet()) ?: emptySet()).toMutableSet()
+        set.remove(url)
+        prefs.edit().putStringSet("ignored_set", set).apply()
+    }
+
+    suspend fun removeTrackFromLibrary(context: Context, track: TrackEntity) {
+        trackDao.deleteTrack(track)
+        addIgnoredUrl(context, track.fileUrl)
+    }
+
+    suspend fun deleteTrackFromDevice(context: Context, track: TrackEntity) {
+        trackDao.deleteTrack(track)
+        addIgnoredUrl(context, track.fileUrl)
+        try {
+            val uri = Uri.parse(track.fileUrl)
+            if (uri.scheme == "content") {
+                context.contentResolver.delete(uri, null, null)
+            } else if (uri.scheme == "file" || uri.path != null) {
+                val file = java.io.File(uri.path ?: "")
+                if (file.exists()) {
+                    file.delete()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MediaRepository", "Error deleting physical file: ${e.message}")
+        }
+    }
+
+    suspend fun restoreTrack(context: Context, track: TrackEntity) {
+        removeIgnoredUrl(context, track.fileUrl)
+        trackDao.insertTrack(track)
+    }
+
     suspend fun scanMediaStore(context: Context): Int {
         var scannedCount = 0
         try {
             val existingUrls = trackDao.getAllFileUrls().toHashSet()
+            val ignoredUrls = getIgnoredUrls(context)
             val newTracks = mutableListOf<TrackEntity>()
 
             // 1. Scan Audio files from MediaStore
@@ -229,7 +277,7 @@ Probing the boundaries of digital animation and immersive surround sound.""",
                     val id = c.getLong(idCol)
                     val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id).toString()
 
-                    if (!existingUrls.contains(contentUri)) {
+                    if (!existingUrls.contains(contentUri) && !ignoredUrls.contains(contentUri)) {
                         val rawTitle = if (titleCol >= 0) c.getString(titleCol) else null
                         val title = if (!rawTitle.isNullOrBlank()) rawTitle else "Audio Track $id"
 
@@ -290,7 +338,7 @@ Probing the boundaries of digital animation and immersive surround sound.""",
                     val id = c.getLong(idCol)
                     val contentUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id).toString()
 
-                    if (!existingUrls.contains(contentUri)) {
+                    if (!existingUrls.contains(contentUri) && !ignoredUrls.contains(contentUri)) {
                         val rawTitle = if (titleCol >= 0) c.getString(titleCol) else null
                         val title = if (!rawTitle.isNullOrBlank()) rawTitle else "Video File $id"
 

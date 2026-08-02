@@ -136,6 +136,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun removeTrackFromLibrary(context: Context, track: TrackEntity) {
+        viewModelScope.launch {
+            if (playerEngine.playerState.value.currentTrack?.id == track.id) {
+                playerEngine.pause()
+            }
+            repository.removeTrackFromLibrary(context, track)
+        }
+    }
+
+    fun deleteTrackFromDevice(context: Context, track: TrackEntity) {
+        viewModelScope.launch {
+            if (playerEngine.playerState.value.currentTrack?.id == track.id) {
+                playerEngine.pause()
+            }
+            repository.deleteTrackFromDevice(context, track)
+            _toastEvent.emit("Deleted '${track.title}' from device")
+        }
+    }
+
+    fun restoreTrack(context: Context, track: TrackEntity) {
+        viewModelScope.launch {
+            repository.restoreTrack(context, track)
+            _toastEvent.emit("Restored '${track.title}'")
+        }
+    }
+
     fun createPlaylist(name: String) {
         viewModelScope.launch {
             if (name.isNotBlank()) {
