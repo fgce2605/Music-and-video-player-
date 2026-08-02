@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Circle badge -->
+    <path
+        android:fillColor="#8B5CF6"
+        android:pathData="M54,24 A30,30 0 1,0 54,84 A30,30 0 1,0 54,24 Z" />
+    <!-- Play Triangle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46,39 L68,54 L46,69 Z" />
+    <!-- Media Accent Dots -->
+    <path
+        android:fillColor="#06B6D4"
+        android:pathData="M24,54 A4,4 0 1,0 24,53.9 Z M84,54 A4,4 0 1,0 84,53.9 Z" />
+</vector>

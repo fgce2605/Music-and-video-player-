@@ -1,0 +1,6 @@
+{
+  "name": "OmniPlay Media Player",
+  "description": "Polished all-in-one audio and video media player with equalizer, playlists, video gesture controls, queue management, and lyrics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
