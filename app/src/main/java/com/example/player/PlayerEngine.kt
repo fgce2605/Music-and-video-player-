@@ -7,6 +7,7 @@ import android.media.PlaybackParams
 import android.media.audiofx.Equalizer
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import android.view.SurfaceHolder
@@ -119,7 +120,14 @@ class PlayerEngine(private val context: Context) {
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .build()
                 )
-                setDataSource(track.fileUrl)
+
+                val fileUri = Uri.parse(track.fileUrl)
+                if (fileUri.scheme == "content" || fileUri.scheme == "file" || fileUri.scheme == "http" || fileUri.scheme == "https") {
+                    setDataSource(context, fileUri)
+                } else {
+                    setDataSource(track.fileUrl)
+                }
+
                 setOnPreparedListener { mp ->
                     val actualDuration = mp.duration.toLong()
                     _playerState.update { state ->
@@ -140,7 +148,8 @@ class PlayerEngine(private val context: Context) {
                     handleTrackCompletion()
                 }
 
-                setOnErrorListener { _, _, _ ->
+                setOnErrorListener { _, what, extra ->
+                    Log.e("PlayerEngine", "MediaPlayer error: what=$what, extra=$extra for url=${track.fileUrl}")
                     _playerState.update { it.copy(isPlaying = false) }
                     true
                 }
@@ -148,7 +157,8 @@ class PlayerEngine(private val context: Context) {
                 prepareAsync()
             }
         } catch (e: Exception) {
-            Log.e("PlayerEngine", "Error initializing player: ${e.message}")
+            Log.e("PlayerEngine", "Error initializing player for ${track.fileUrl}: ${e.message}", e)
+            _playerState.update { it.copy(isPlaying = false) }
         }
     }
 

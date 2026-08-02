@@ -1,5 +1,10 @@
 package com.example.data.repository
 
+import android.content.ContentUris
+import android.content.Context
+import android.net.Uri
+import android.provider.MediaStore
+import android.util.Log
 import com.example.data.local.PlayHistoryDao
 import com.example.data.local.PlaylistDao
 import com.example.data.local.TrackDao
@@ -185,5 +190,141 @@ Probing the boundaries of digital animation and immersive surround sound.""",
                 playlistDao.insertCrossRef(PlaylistTrackCrossRef(playlistId, 2L, 1))
             }
         }
+    }
+
+    suspend fun scanMediaStore(context: Context): Int {
+        var scannedCount = 0
+        try {
+            val existingUrls = trackDao.getAllFileUrls().toHashSet()
+            val newTracks = mutableListOf<TrackEntity>()
+
+            // 1. Scan Audio files from MediaStore
+            val audioProjection = arrayOf(
+                MediaStore.Audio.Media._ID,
+                MediaStore.Audio.Media.TITLE,
+                MediaStore.Audio.Media.ARTIST,
+                MediaStore.Audio.Media.ALBUM,
+                MediaStore.Audio.Media.DURATION,
+                MediaStore.Audio.Media.ALBUM_ID
+            )
+            val audioSelection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.DURATION} > 1000"
+            val audioCursor = context.contentResolver.query(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                audioProjection,
+                audioSelection,
+                null,
+                "${MediaStore.Audio.Media.DATE_ADDED} DESC"
+            )
+
+            audioCursor?.use { c ->
+                val idCol = c.getColumnIndex(MediaStore.Audio.Media._ID)
+                val titleCol = c.getColumnIndex(MediaStore.Audio.Media.TITLE)
+                val artistCol = c.getColumnIndex(MediaStore.Audio.Media.ARTIST)
+                val albumCol = c.getColumnIndex(MediaStore.Audio.Media.ALBUM)
+                val durCol = c.getColumnIndex(MediaStore.Audio.Media.DURATION)
+                val albumIdCol = c.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID)
+
+                while (c.moveToNext()) {
+                    if (idCol < 0) continue
+                    val id = c.getLong(idCol)
+                    val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id).toString()
+
+                    if (!existingUrls.contains(contentUri)) {
+                        val rawTitle = if (titleCol >= 0) c.getString(titleCol) else null
+                        val title = if (!rawTitle.isNullOrBlank()) rawTitle else "Audio Track $id"
+
+                        val rawArtist = if (artistCol >= 0) c.getString(artistCol) else null
+                        val artist = if (!rawArtist.isNullOrBlank() && rawArtist != "<unknown>") rawArtist else "Unknown Artist"
+
+                        val rawAlbum = if (albumCol >= 0) c.getString(albumCol) else null
+                        val album = if (!rawAlbum.isNullOrBlank() && rawAlbum != "<unknown>") rawAlbum else "Local Library"
+
+                        val duration = if (durCol >= 0) c.getLong(durCol) else 0L
+
+                        val albumId = if (albumIdCol >= 0) c.getLong(albumIdCol) else -1L
+                        val artworkUri = if (albumId >= 0) {
+                            ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumId).toString()
+                        } else null
+
+                        newTracks.add(
+                            TrackEntity(
+                                title = title,
+                                artist = artist,
+                                album = album,
+                                durationMs = duration,
+                                mediaType = MediaType.AUDIO,
+                                fileUrl = contentUri,
+                                thumbnailUrl = artworkUri
+                            )
+                        )
+                        existingUrls.add(contentUri)
+                    }
+                }
+            }
+
+            // 2. Scan Video files from MediaStore
+            val videoProjection = arrayOf(
+                MediaStore.Video.Media._ID,
+                MediaStore.Video.Media.TITLE,
+                MediaStore.Video.Media.ARTIST,
+                MediaStore.Video.Media.ALBUM,
+                MediaStore.Video.Media.DURATION
+            )
+            val videoCursor = context.contentResolver.query(
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                videoProjection,
+                null,
+                null,
+                "${MediaStore.Video.Media.DATE_ADDED} DESC"
+            )
+
+            videoCursor?.use { c ->
+                val idCol = c.getColumnIndex(MediaStore.Video.Media._ID)
+                val titleCol = c.getColumnIndex(MediaStore.Video.Media.TITLE)
+                val artistCol = c.getColumnIndex(MediaStore.Video.Media.ARTIST)
+                val albumCol = c.getColumnIndex(MediaStore.Video.Media.ALBUM)
+                val durCol = c.getColumnIndex(MediaStore.Video.Media.DURATION)
+
+                while (c.moveToNext()) {
+                    if (idCol < 0) continue
+                    val id = c.getLong(idCol)
+                    val contentUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id).toString()
+
+                    if (!existingUrls.contains(contentUri)) {
+                        val rawTitle = if (titleCol >= 0) c.getString(titleCol) else null
+                        val title = if (!rawTitle.isNullOrBlank()) rawTitle else "Video File $id"
+
+                        val rawArtist = if (artistCol >= 0) c.getString(artistCol) else null
+                        val artist = if (!rawArtist.isNullOrBlank() && rawArtist != "<unknown>") rawArtist else "Local Video"
+
+                        val rawAlbum = if (albumCol >= 0) c.getString(albumCol) else null
+                        val album = if (!rawAlbum.isNullOrBlank() && rawAlbum != "<unknown>") rawAlbum else "Gallery Videos"
+
+                        val duration = if (durCol >= 0) c.getLong(durCol) else 0L
+
+                        newTracks.add(
+                            TrackEntity(
+                                title = title,
+                                artist = artist,
+                                album = album,
+                                durationMs = duration,
+                                mediaType = MediaType.VIDEO,
+                                fileUrl = contentUri,
+                                thumbnailUrl = contentUri
+                            )
+                        )
+                        existingUrls.add(contentUri)
+                    }
+                }
+            }
+
+            if (newTracks.isNotEmpty()) {
+                trackDao.insertTracks(newTracks)
+                scannedCount = newTracks.size
+            }
+        } catch (e: Exception) {
+            Log.e("MediaRepository", "Error scanning MediaStore: ${e.message}")
+        }
+        return scannedCount
     }
 }

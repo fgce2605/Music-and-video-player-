@@ -55,6 +55,7 @@ import com.example.ui.screens.PlaylistsScreen
 import com.example.ui.screens.SearchScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.theme.OmniPlayTheme
+import com.example.util.PermissionUtils
 
 enum class BottomTab(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     HOME("Home", Icons.Default.Home),
@@ -102,8 +103,17 @@ fun MainAppScaffold(viewModel: MainViewModel) {
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
+        if (PermissionUtils.hasMediaPermissions(context)) {
+            viewModel.scanDeviceMedia(context)
+        }
         viewModel.toastEvent.collect { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    LaunchedEffect(playerState.currentTrack?.id) {
+        if (playerState.currentTrack?.mediaType == MediaType.VIDEO) {
+            showFullPlayer = true
         }
     }
 

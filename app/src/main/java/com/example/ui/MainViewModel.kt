@@ -14,6 +14,7 @@ import com.example.data.model.TrackEntity
 import com.example.data.repository.MediaRepository
 import com.example.player.PlayerEngine
 import com.example.player.PlayerState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -89,6 +90,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Preferences & Theme
     val isDarkTheme = MutableStateFlow(true)
+    val isScanning = MutableStateFlow(false)
 
     // Toast & Event channel
     private val _toastEvent = MutableSharedFlow<String>()
@@ -102,6 +104,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         playerEngine.setOnTrackFinishedCallback { track, posSec ->
             viewModelScope.launch {
                 repository.addPlayHistory(track.id, posSec)
+            }
+        }
+    }
+
+    fun scanDeviceMedia(context: Context) {
+        if (isScanning.value) return
+        viewModelScope.launch(Dispatchers.IO) {
+            isScanning.value = true
+            val count = repository.scanMediaStore(context)
+            isScanning.value = false
+            if (count > 0) {
+                _toastEvent.emit("Discovered $count audio/video files from storage")
             }
         }
     }

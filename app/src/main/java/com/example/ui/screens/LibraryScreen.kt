@@ -17,27 +17,35 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +62,7 @@ import com.example.data.model.PlaylistEntity
 import com.example.data.model.SortOption
 import com.example.data.model.TrackEntity
 import com.example.ui.MainViewModel
+import com.example.util.PermissionUtils
 
 @Composable
 fun LibraryScreen(
@@ -67,6 +76,26 @@ fun LibraryScreen(
     var showSortMenu by remember { mutableStateOf(false) }
     var selectedTrackForMenu by remember { mutableStateOf<TrackEntity?>(null) }
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
+
+    var hasPermission by remember { mutableStateOf(PermissionUtils.hasMediaPermissions(context)) }
+    val isScanning by viewModel.isScanning.collectAsState()
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions.values.all { it }
+        hasPermission = granted || PermissionUtils.hasMediaPermissions(context)
+        if (granted || hasPermission) {
+            viewModel.scanDeviceMedia(context)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (PermissionUtils.hasMediaPermissions(context)) {
+            hasPermission = true
+            viewModel.scanDeviceMedia(context)
+        }
+    }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -111,23 +140,88 @@ fun LibraryScreen(
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
                 )
 
-                Box {
-                    IconButton(onClick = { showSortMenu = !showSortMenu }) {
-                        Icon(imageVector = Icons.Default.Sort, contentDescription = "Sort")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = {
+                            if (hasPermission) {
+                                viewModel.scanDeviceMedia(context)
+                            } else {
+                                permissionLauncher.launch(PermissionUtils.getRequiredMediaPermissions())
+                            }
+                        }
+                    ) {
+                        Icon(imageVector = Icons.Default.Refresh, contentDescription = "Rescan Media")
                     }
 
-                    DropdownMenu(
-                        expanded = showSortMenu,
-                        onDismissRequest = { showSortMenu = false }
-                    ) {
-                        SortOption.values().forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text("Sort by ${option.name.lowercase().capitalize()}") },
-                                onClick = {
-                                    viewModel.librarySortOption.value = option
-                                    showSortMenu = false
-                                }
+                    Box {
+                        IconButton(onClick = { showSortMenu = !showSortMenu }) {
+                            Icon(imageVector = Icons.Default.Sort, contentDescription = "Sort")
+                        }
+
+                        DropdownMenu(
+                            expanded = showSortMenu,
+                            onDismissRequest = { showSortMenu = false }
+                        ) {
+                            SortOption.values().forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text("Sort by ${option.name.lowercase().capitalize()}") },
+                                    onClick = {
+                                        viewModel.librarySortOption.value = option
+                                        showSortMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isScanning) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+
+            if (!hasPermission) {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Folder,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(28.dp)
                             )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Storage Permission Needed",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    text = "Allow app to automatically discover audio & video files saved on your device.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Button(
+                                onClick = {
+                                    permissionLauncher.launch(PermissionUtils.getRequiredMediaPermissions())
+                                }
+                            ) {
+                                Text("Grant Permission")
+                            }
                         }
                     }
                 }

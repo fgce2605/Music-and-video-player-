@@ -53,6 +53,9 @@ interface TrackDao {
 
     @Query("SELECT COUNT(*) FROM tracks")
     suspend fun getTrackCount(): Int
+
+    @Query("SELECT fileUrl FROM tracks")
+    suspend fun getAllFileUrls(): List<String>
 }
 
 @Dao
