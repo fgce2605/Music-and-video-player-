@@ -113,11 +113,7 @@ fun LibraryScreen(
                     .padding(bottom = 90.dp)
                     .testTag("import_media_fab")
             ) {
-                Row(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Icon(imageVector = Icons.Default.UploadFile, contentDescription = "Import")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Import Media", fontWeight = FontWeight.Bold)
-                }
+                Icon(imageVector = Icons.Default.UploadFile, contentDescription = "Import Media")
             }
         },
         modifier = modifier.fillMaxSize().testTag("library_screen")
@@ -141,6 +137,10 @@ fun LibraryScreen(
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { filePickerLauncher.launch("*/*") }) {
+                        Icon(imageVector = Icons.Default.UploadFile, contentDescription = "Import Media")
+                    }
+
                     IconButton(
                         onClick = {
                             if (hasPermission) {

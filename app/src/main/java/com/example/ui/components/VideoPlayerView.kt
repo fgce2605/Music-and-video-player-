@@ -65,7 +65,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.example.data.model.TrackEntity
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.material.icons.filled.AspectRatio
+import com.example.player.VideoScaleMode
 import com.example.player.PlayerEngine
 import com.example.player.PlayerState
 import kotlinx.coroutines.delay
@@ -160,24 +164,52 @@ fun VideoPlayerView(
             .testTag("video_player_container")
     ) {
         // Video Surface
-        AndroidView(
-            factory = { context ->
-                SurfaceView(context).apply {
-                    holder.addCallback(object : SurfaceHolder.Callback {
-                        override fun surfaceCreated(holder: SurfaceHolder) {
-                            playerEngine.setDisplaySurface(holder)
-                        }
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            val containerRatio = if (maxHeight.value > 0) maxWidth.value / maxHeight.value else 16f / 9f
+            val videoRatio = if (playerState.videoAspectRatio > 0) playerState.videoAspectRatio else 16f / 9f
 
-                        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
-
-                        override fun surfaceDestroyed(holder: SurfaceHolder) {
-                            playerEngine.setDisplaySurface(null)
-                        }
-                    })
+            val surfaceModifier = when (playerState.videoScaleMode) {
+                VideoScaleMode.FIT -> {
+                    if (videoRatio > containerRatio) {
+                        Modifier.fillMaxWidth().aspectRatio(videoRatio)
+                    } else {
+                        Modifier.fillMaxHeight().aspectRatio(videoRatio)
+                    }
                 }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
+                VideoScaleMode.FILL -> {
+                    if (videoRatio > containerRatio) {
+                        Modifier.fillMaxHeight().aspectRatio(videoRatio)
+                    } else {
+                        Modifier.fillMaxWidth().aspectRatio(videoRatio)
+                    }
+                }
+                VideoScaleMode.STRETCH -> {
+                    Modifier.fillMaxSize()
+                }
+            }
+
+            AndroidView(
+                factory = { context ->
+                    SurfaceView(context).apply {
+                        holder.addCallback(object : SurfaceHolder.Callback {
+                            override fun surfaceCreated(holder: SurfaceHolder) {
+                                playerEngine.setDisplaySurface(holder)
+                            }
+
+                            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
+
+                            override fun surfaceDestroyed(holder: SurfaceHolder) {
+                                playerEngine.setDisplaySurface(null)
+                            }
+                        })
+                    }
+                },
+                modifier = surfaceModifier
+            )
+        }
 
         // Subtitle Overlay
         if (!playerState.activeSubtitleCue.isNull_or_blank()) {
@@ -354,6 +386,19 @@ fun VideoPlayerView(
                             )
 
                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                TextButton(onClick = {
+                                    playerEngine.cycleVideoScaleMode()
+                                    gestureStatusText = "Aspect Ratio: ${playerState.videoScaleMode.label}"
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.Default.AspectRatio,
+                                        contentDescription = "Aspect Ratio",
+                                        tint = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(playerState.videoScaleMode.label, color = Color.White)
+                                }
+
                                 Box {
                                     TextButton(onClick = { showSpeedMenu = !showSpeedMenu }) {
                                         Icon(

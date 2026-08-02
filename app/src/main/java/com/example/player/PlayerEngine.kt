@@ -25,6 +25,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+enum class VideoScaleMode(val label: String) {
+    FIT("Fit"),
+    FILL("Fill"),
+    STRETCH("Stretch")
+}
+
 data class PlayerState(
     val currentTrack: TrackEntity? = null,
     val isPlaying: Boolean = false,
@@ -46,7 +52,9 @@ data class PlayerState(
     val isVideoFullscreen: Boolean = false,
     val isVideoLocked: Boolean = false,
     val videoBrightness: Float = 0.5f,
-    val videoVolume: Float = 1.0f
+    val videoVolume: Float = 1.0f,
+    val videoScaleMode: VideoScaleMode = VideoScaleMode.FIT,
+    val videoAspectRatio: Float = 16f / 9f
 )
 
 class PlayerEngine(private val context: Context) {
@@ -67,7 +75,23 @@ class PlayerEngine(private val context: Context) {
     private var onTrackFinishedCallback: ((TrackEntity, Long) -> Unit)? = null
 
     init {
+        com.example.service.MediaPlaybackService.activePlayerEngine = this
         setupMediaSession()
+    }
+
+    fun getMediaSessionToken(): android.media.session.MediaSession.Token? {
+        return mediaSession?.sessionToken
+    }
+
+    fun cycleVideoScaleMode() {
+        _playerState.update { s ->
+            val nextMode = when (s.videoScaleMode) {
+                VideoScaleMode.FIT -> VideoScaleMode.FILL
+                VideoScaleMode.FILL -> VideoScaleMode.STRETCH
+                VideoScaleMode.STRETCH -> VideoScaleMode.FIT
+            }
+            s.copy(videoScaleMode = nextMode)
+        }
     }
 
     fun setOnTrackFinishedCallback(callback: (TrackEntity, Long) -> Unit) {
@@ -126,6 +150,13 @@ class PlayerEngine(private val context: Context) {
                     setDataSource(context, fileUri)
                 } else {
                     setDataSource(track.fileUrl)
+                }
+
+                setOnVideoSizeChangedListener { _, width, height ->
+                    if (width > 0 && height > 0) {
+                        val ratio = width.toFloat() / height.toFloat()
+                        _playerState.update { s -> s.copy(videoAspectRatio = ratio) }
+                    }
                 }
 
                 setOnPreparedListener { mp ->
@@ -477,6 +508,21 @@ class PlayerEngine(private val context: Context) {
                 )
                 .setState(sessionState, _playerState.value.currentPositionMs, _playerState.value.playbackSpeed)
             mediaSession?.setPlaybackState(stateBuilder.build())
+
+            val track = _playerState.value.currentTrack
+            if (track != null) {
+                val isPlaying = sessionState == PlaybackState.STATE_PLAYING
+                if (isPlaying || sessionState == PlaybackState.STATE_PAUSED) {
+                    com.example.service.MediaPlaybackService.updateNotification(
+                        context,
+                        track.title,
+                        track.artist,
+                        isPlaying
+                    )
+                } else if (sessionState == PlaybackState.STATE_STOPPED) {
+                    com.example.service.MediaPlaybackService.stop(context)
+                }
+            }
         } catch (e: Exception) {
             Log.e("PlayerEngine", "MediaSession update state error: ${e.message}")
         }
