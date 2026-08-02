@@ -34,6 +34,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -208,11 +212,15 @@ fun MediaCardItem(
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
-                if (!track.thumbnailUrl.isNull_or_blank()) {
+                var hasError by remember(track.thumbnailUrl) { mutableStateOf(false) }
+                val showImage = !track.thumbnailUrl.isNull_or_blank() && track.thumbnailUrl != track.fileUrl && !hasError
+
+                if (showImage) {
                     AsyncImage(
                         model = track.thumbnailUrl,
                         contentDescription = "Cover",
                         contentScale = ContentScale.Crop,
+                        onError = { hasError = true },
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
@@ -290,11 +298,15 @@ fun TrackListItem(
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
-                if (!track.thumbnailUrl.isNull_or_blank()) {
+                var hasError by remember(track.thumbnailUrl) { mutableStateOf(false) }
+                val showImage = !track.thumbnailUrl.isNull_or_blank() && track.thumbnailUrl != track.fileUrl && !hasError
+
+                if (showImage) {
                     AsyncImage(
                         model = track.thumbnailUrl,
                         contentDescription = "Track Artwork",
                         contentScale = ContentScale.Crop,
+                        onError = { hasError = true },
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {

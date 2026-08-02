@@ -595,11 +595,15 @@ fun TrackListItemRow(
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
-                if (!track.thumbnailUrl.isNullOrBlank()) {
+                var hasError by remember(track.thumbnailUrl) { mutableStateOf(false) }
+                val showImage = !track.thumbnailUrl.isNullOrBlank() && track.thumbnailUrl != track.fileUrl && !hasError
+
+                if (showImage) {
                     AsyncImage(
                         model = track.thumbnailUrl,
                         contentDescription = "Track Artwork",
                         contentScale = ContentScale.Crop,
+                        onError = { hasError = true },
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
@@ -709,11 +713,15 @@ fun TrackGridCardItem(
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
-                if (!track.thumbnailUrl.isNullOrBlank()) {
+                var hasError by remember(track.thumbnailUrl) { mutableStateOf(false) }
+                val showImage = !track.thumbnailUrl.isNullOrBlank() && track.thumbnailUrl != track.fileUrl && !hasError
+
+                if (showImage) {
                     AsyncImage(
                         model = track.thumbnailUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
+                        onError = { hasError = true },
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
@@ -784,11 +792,15 @@ fun TrackLargeCardItem(
                     .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)),
                 contentAlignment = Alignment.Center
             ) {
-                if (!track.thumbnailUrl.isNullOrBlank()) {
+                var hasError by remember(track.thumbnailUrl) { mutableStateOf(false) }
+                val showImage = !track.thumbnailUrl.isNullOrBlank() && track.thumbnailUrl != track.fileUrl && !hasError
+
+                if (showImage) {
                     AsyncImage(
                         model = track.thumbnailUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
+                        onError = { hasError = true },
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {

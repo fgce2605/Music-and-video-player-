@@ -21,6 +21,9 @@ interface TrackDao {
     @Query("SELECT * FROM tracks WHERE mediaType = :type ORDER BY title ASC")
     fun getTracksByType(type: MediaType): Flow<List<TrackEntity>>
 
+    @Query("SELECT * FROM tracks WHERE mediaType = :type")
+    suspend fun getTracksByTypeSync(type: MediaType): List<TrackEntity>
+
     @Query("SELECT * FROM tracks WHERE isFavorite = 1 ORDER BY title ASC")
     fun getFavoriteTracks(): Flow<List<TrackEntity>>
 

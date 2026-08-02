@@ -113,6 +113,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             isScanning.value = true
             val count = repository.scanMediaStore(context)
+            repository.ensureVideoThumbnails(context)
             isScanning.value = false
             if (count > 0) {
                 _toastEvent.emit("Discovered $count audio/video files from storage")
@@ -210,24 +211,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun importLocalFile(uri: Uri, context: Context) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val fileName = getFileName(context, uri) ?: "Local Track"
                 val mimeType = context.contentResolver.getType(uri) ?: ""
                 val isVideo = mimeType.startsWith("video/") || fileName.endsWith(".mp4") || fileName.endsWith(".mkv") || fileName.endsWith(".webm")
 
                 val title = fileName.substringBeforeLast(".")
-                val newTrack = TrackEntity(
+                val tempTrack = TrackEntity(
                     title = title,
                     artist = "Local Library",
                     album = if (isVideo) "Local Video" else "Local Audio",
                     durationMs = 180000L, // Estimated / fallback
                     mediaType = if (isVideo) MediaType.VIDEO else MediaType.AUDIO,
                     fileUrl = uri.toString(),
-                    thumbnailUrl = if (isVideo) "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=600&auto=format&fit=crop" else null
+                    thumbnailUrl = null
                 )
 
-                val id = repository.insertTrack(newTrack)
+                val thumbUrl = if (isVideo) {
+                    com.example.util.VideoThumbnailUtils.getOrCreateVideoThumbnail(context, tempTrack)
+                } else null
+
+                val finalTrack = tempTrack.copy(thumbnailUrl = thumbUrl)
+                val id = repository.insertTrack(finalTrack)
                 _toastEvent.emit("Imported '$title'")
             } catch (e: Exception) {
                 _toastEvent.emit("Failed to import file: ${e.message}")

@@ -239,6 +239,22 @@ Probing the boundaries of digital animation and immersive surround sound.""",
         trackDao.insertTrack(track)
     }
 
+    suspend fun ensureVideoThumbnails(context: Context) {
+        try {
+            val allVideoTracks = trackDao.getTracksByTypeSync(MediaType.VIDEO)
+            for (track in allVideoTracks) {
+                if (track.thumbnailUrl.isNullOrBlank() || track.thumbnailUrl == track.fileUrl || track.thumbnailUrl!!.startsWith("content://")) {
+                    val thumbUrl = com.example.util.VideoThumbnailUtils.getOrCreateVideoThumbnail(context, track)
+                    if (!thumbUrl.isNullOrBlank() && thumbUrl != track.thumbnailUrl) {
+                        trackDao.updateTrack(track.copy(thumbnailUrl = thumbUrl))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MediaRepository", "Error ensuring video thumbnails: ${e.message}")
+        }
+    }
+
     suspend fun scanMediaStore(context: Context): Int {
         var scannedCount = 0
         try {
@@ -350,17 +366,19 @@ Probing the boundaries of digital animation and immersive surround sound.""",
 
                         val duration = if (durCol >= 0) c.getLong(durCol) else 0L
 
-                        newTracks.add(
-                            TrackEntity(
-                                title = title,
-                                artist = artist,
-                                album = album,
-                                durationMs = duration,
-                                mediaType = MediaType.VIDEO,
-                                fileUrl = contentUri,
-                                thumbnailUrl = contentUri
-                            )
+                        val tempTrack = TrackEntity(
+                            title = title,
+                            artist = artist,
+                            album = album,
+                            durationMs = duration,
+                            mediaType = MediaType.VIDEO,
+                            fileUrl = contentUri,
+                            thumbnailUrl = null
                         )
+
+                        val thumbUrl = com.example.util.VideoThumbnailUtils.getOrCreateVideoThumbnail(context, tempTrack)
+
+                        newTracks.add(tempTrack.copy(thumbnailUrl = thumbUrl))
                         existingUrls.add(contentUri)
                     }
                 }
